@@ -175,7 +175,7 @@ with st.sidebar:
 
     st.divider()
     st.caption("**Stack:** PostgreSQL · XGBoost · FastAPI · MLflow · Streamlit")
-    st.caption("**GitHub:** [customer-analytics-platform](https://github.com/dkamissah/customer-analytics-platform)")
+    st.caption("**GitHub:** [customer-analytics-platform](https://github.com/danielamissah/customer-analytics-platform)")
 
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
