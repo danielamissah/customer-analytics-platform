@@ -19,7 +19,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, text
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -46,17 +46,19 @@ RISK_COLORS = {"low": "#2ECC71", "medium": "#F39C12", "high": "#E74C3C"}
 @st.cache_resource
 def get_engine():
     try:
-        # Try Streamlit secrets as individual params first (avoids URL encoding issues)
         secrets = st.secrets
         if "db_host" in secrets:
-            return create_engine(
-                f"postgresql+psycopg2://{secrets['db_user']}:{secrets['db_password']}@{secrets['db_host']}:{secrets.get('db_port', 5432)}/{secrets['db_name']}",
-                connect_args={"sslmode": "require"}
-            )
-    except Exception:
-        pass
-    # Fall back to DATABASE_URL
-    return create_engine(DB_URL, connect_args={"sslmode": "require"})
+            url = f"postgresql+psycopg2://{secrets['db_user']}:{secrets['db_password']}@{secrets['db_host']}:{secrets.get('db_port', 5432)}/{secrets['db_name']}"
+            engine = create_engine(url, connect_args={"sslmode": "require"})
+            # Test connection
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return engine
+    except Exception as e:
+        st.error(f"DB connection failed: {str(e)}")
+        st.stop()
+    st.error("No database credentials found in secrets.")
+    st.stop()
 
 engine = get_engine()
 
@@ -190,7 +192,7 @@ with st.sidebar:
 
     st.divider()
     st.caption("**Stack:** PostgreSQL · XGBoost · FastAPI · MLflow · Streamlit")
-    # st.caption("**GitHub:** [customer-analytics-platform](https://github.com/danielamissah/customer-analytics-platform)")
+    st.caption("**GitHub:** [customer-analytics-platform](https://github.com/dkamissah/customer-analytics-platform)")
 
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
