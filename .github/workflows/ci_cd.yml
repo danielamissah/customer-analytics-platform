@@ -52,16 +52,15 @@ jobs:
 
       - name: Initialise database
         run: |
-          pip install psycopg2-binary
           python -c "
-from sqlalchemy import create_engine, text
-import os
-engine = create_engine(os.environ['DATABASE_URL'])
-with engine.connect() as conn:
-    conn.execute(text(open('scripts/init_db.sql').read()))
-    conn.commit()
-print('Schema created')
-"
+          from sqlalchemy import create_engine, text; import os
+          engine = create_engine(os.environ['DATABASE_URL'])
+          sql = open('scripts/init_db.sql').read()
+          with engine.connect() as conn:
+            conn.execute(text(sql))
+            conn.commit()
+          print('Schema created')
+          "
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
@@ -102,32 +101,3 @@ print('Schema created')
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-  # ── Deploy to Kubernetes (minikube via self-hosted runner) ───────────────────
-  deploy:
-    name: Deploy to Kubernetes
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-
-      - name: Update image tag in deployment
-        run: |
-          SHA="${{ github.sha }}"
-          sed -i "s|:latest|:sha-${SHA::7}|g" k8s/deployment.yaml
-
-      - name: Apply Kubernetes manifests
-        run: |
-          kubectl apply -f k8s/deployment.yaml
-          kubectl rollout status deployment/analytics-api \
-            -n customer-analytics --timeout=120s
-
-      - name: Verify deployment
-        run: |
-          kubectl get pods -n customer-analytics
-          kubectl get services -n customer-analytics
