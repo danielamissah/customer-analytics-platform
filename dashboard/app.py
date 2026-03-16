@@ -45,14 +45,18 @@ RISK_COLORS = {"low": "#2ECC71", "medium": "#F39C12", "high": "#E74C3C"}
 
 @st.cache_resource
 def get_engine():
-    url = DB_URL
-    # Ensure SSL for Supabase / cloud connections
-    if "supabase" in url or "sslmode" not in url:
-        if "?" in url:
-            url += "&sslmode=require"
-        else:
-            url += "?sslmode=require"
-    return create_engine(url, connect_args={"sslmode": "require"})
+    try:
+        # Try Streamlit secrets as individual params first (avoids URL encoding issues)
+        secrets = st.secrets
+        if "db_host" in secrets:
+            return create_engine(
+                f"postgresql+psycopg2://{secrets['db_user']}:{secrets['db_password']}@{secrets['db_host']}:{secrets.get('db_port', 5432)}/{secrets['db_name']}",
+                connect_args={"sslmode": "require"}
+            )
+    except Exception:
+        pass
+    # Fall back to DATABASE_URL
+    return create_engine(DB_URL, connect_args={"sslmode": "require"})
 
 engine = get_engine()
 
