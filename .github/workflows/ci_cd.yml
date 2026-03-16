@@ -51,7 +51,9 @@ jobs:
         run: ruff check src/ --ignore E501
 
       - name: Initialise database
-        run: psql $DATABASE_URL -f scripts/init_db.sql
+        run: |
+          docker exec -i customer-analytics-platform-postgres-1 \
+            psql -U analytics -d customer_analytics < scripts/init_db.sql
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
