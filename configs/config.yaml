@@ -1,0 +1,70 @@
+project:
+  name: customer-analytics-platform
+  version: "1.0.0"
+  description: >
+    Production-grade customer analytics platform — nightly data refresh,
+    churn prediction, LTV forecasting, A/B testing framework,
+    FastAPI model serving, Docker, Kubernetes, GitHub Actions CI/CD.
+
+database:
+  url: "postgresql://analytics:analytics@localhost:5432/customer_analytics"
+  tables:
+    users: "users"
+    events: "user_events"
+    subscriptions: "subscriptions"
+    transactions: "transactions"
+    ab_tests: "ab_tests"
+    ab_assignments: "ab_assignments"
+    predictions: "predictions"
+
+data_generation:
+  daily_new_users: 80          # new users generated per night
+  churn_rate_base: 0.08        # 8% monthly churn baseline
+  ltv_mean: 240                # mean LTV in EUR
+  ltv_std: 120
+  plans: ["free", "starter", "pro", "enterprise"]
+  plan_weights: [0.45, 0.30, 0.18, 0.07]
+  channels: ["organic", "paid_search", "social", "email", "referral", "affiliate"]
+  channel_weights: [0.30, 0.25, 0.20, 0.10, 0.10, 0.05]
+  countries: ["Germany", "Austria", "Switzerland", "United Kingdom", "France", "Netherlands", "Spain", "Italy", "Poland", "Sweden"]
+
+models:
+  churn:
+    name: "churn_predictor"
+    algorithm: "XGBoost"
+    threshold: 0.35
+    retrain_min_samples: 200
+    features:
+      - days_since_signup
+      - session_count_7d
+      - session_count_30d
+      - avg_session_duration
+      - feature_usage_score
+      - support_tickets
+      - plan_encoded
+      - channel_encoded
+      - country_encoded
+      - days_since_last_login
+      - total_revenue
+      - payment_failures
+  ltv:
+    name: "ltv_forecaster"
+    algorithm: "XGBoost"
+    horizon_days: 365
+    retrain_min_samples: 200
+
+ab_testing:
+  min_sample_size: 100
+  significance_level: 0.05
+  power: 0.80
+
+mlflow:
+  tracking_uri: "http://localhost:5002"
+  experiment: "customer-analytics-platform"
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+
+monitoring:
+  drift_threshold: 0.10

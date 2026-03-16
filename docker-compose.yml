@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER:     analytics
+      POSTGRES_PASSWORD: analytics
+      POSTGRES_DB:       customer_analytics
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "analytics"]
+      interval: 10s
+      retries: 5
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.10.0
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5002
+    ports:
+      - "5002:5002"
+    volumes:
+      - mlflow_data:/mlflow
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: "postgresql://analytics:analytics@postgres:5432/customer_analytics"
+      MLFLOW_TRACKING_URI: "http://mlflow:5002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./outputs:/app/outputs
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      DATABASE_URL: "postgresql://analytics:analytics@postgres:5432/customer_analytics"
+      API_URL: "http://api:8000"
+    depends_on:
+      - postgres
+      - api
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  mlflow_data:

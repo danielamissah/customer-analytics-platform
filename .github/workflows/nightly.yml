@@ -1,0 +1,62 @@
+name: Nightly Data Refresh & Retrain
+
+on:
+  schedule:
+    - cron: "0 1 * * *"   # 01:00 UTC every night
+  workflow_dispatch:        # allow manual trigger
+
+jobs:
+  nightly:
+    name: Generate Data & Retrain Models
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER:     analytics
+          POSTGRES_PASSWORD: analytics
+          POSTGRES_DB:       customer_analytics
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate nightly data
+        run: |
+          PYTHONPATH=. python src/data/generator.py
+          echo "Nightly data generation complete"
+
+      - name: Retrain churn model
+        run: |
+          PYTHONPATH=. python src/models/churn.py
+          echo "Churn model retrained"
+
+      - name: Retrain LTV model
+        run: |
+          PYTHONPATH=. python src/models/ltv.py
+          echo "LTV model retrained"
+
+      - name: Trigger API reload
+        run: |
+          curl -X POST "${{ secrets.API_URL }}/retrain" \
+               -H "Content-Type: application/json" || true
+          echo "API reload triggered"
