@@ -52,8 +52,16 @@ jobs:
 
       - name: Initialise database
         run: |
-          docker exec -i customer-analytics-platform-postgres-1 \
-            psql -U analytics -d customer_analytics < scripts/init_db.sql
+          pip install psycopg2-binary
+          python -c "
+from sqlalchemy import create_engine, text
+import os
+engine = create_engine(os.environ['DATABASE_URL'])
+with engine.connect() as conn:
+    conn.execute(text(open('scripts/init_db.sql').read()))
+    conn.commit()
+print('Schema created')
+"
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
@@ -94,8 +102,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   # ── Deploy to Kubernetes (minikube via self-hosted runner) ───────────────────
   deploy:
