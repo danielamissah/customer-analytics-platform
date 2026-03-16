@@ -5,9 +5,7 @@ XGBoost regressor predicting 12-month customer lifetime value.
 Trained nightly, tracked in MLflow.
 """
 
-import os
 import pickle
-import yaml
 import mlflow
 import pandas as pd
 import numpy as np

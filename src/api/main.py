@@ -5,21 +5,18 @@ REST API exposing churn prediction, LTV forecasting,
 and A/B test management endpoints.
 """
 
-import os
-import yaml
 import pandas as pd
 from datetime import datetime, timezone
-from typing import Optional
 from loguru import logger
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from src.data.features import load_config, get_engine, build_features, FEATURE_COLS
+from src.data.features import load_config, get_engine, build_features
 from src.models.churn import load_churn_model, predict_churn, train_churn_model
-from src.models.ltv import load_ltv_model, predict_ltv, train_ltv_model, LTV_FEATURES
+from src.models.ltv import load_ltv_model, predict_ltv, train_ltv_model
 from src.models.ab_testing import (
-    create_test, assign_users, record_conversion, analyse_test, required_sample_size
+    create_test, assign_users, analyse_test, required_sample_size
 )
 
 app = FastAPI(

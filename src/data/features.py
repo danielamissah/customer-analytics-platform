@@ -8,7 +8,6 @@ from raw events, transactions, and subscription data.
 import os
 import yaml
 import pandas as pd
-import numpy as np
 from datetime import datetime, timezone, timedelta
 from loguru import logger
 from sqlalchemy import create_engine

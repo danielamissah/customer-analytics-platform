@@ -29,9 +29,13 @@ st.set_page_config(
 )
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-DB_URL  = os.environ.get("DATABASE_URL",
-          "postgresql://analytics:analytics@localhost:5432/customer_analytics")
-API_URL = os.environ.get("API_URL", "http://localhost:8000")
+try:
+    DB_URL  = st.secrets["DATABASE_URL"]
+    API_URL = st.secrets.get("API_URL", "http://localhost:8000")
+except Exception:
+    DB_URL  = os.environ.get("DATABASE_URL",
+              "postgresql://analytics:analytics@localhost:5432/customer_analytics")
+    API_URL = os.environ.get("API_URL", "http://localhost:8000")
 
 PLAN_COLORS = {
     "free": "#95A5A6", "starter": "#3498DB",
@@ -175,8 +179,7 @@ with st.sidebar:
 
     st.divider()
     st.caption("**Stack:** PostgreSQL · XGBoost · FastAPI · MLflow · Streamlit")
-    st.caption("**GitHub:** [customer-analytics-platform](https://github.com/danielamissah/customer-analytics-platform)")
-
+    
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5 = st.tabs([

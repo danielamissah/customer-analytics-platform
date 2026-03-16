@@ -5,17 +5,14 @@ XGBoost binary classifier predicting 30-day churn probability.
 Trained nightly on fresh data, tracked in MLflow.
 """
 
-import os
 import pickle
-import yaml
 import mlflow
 import mlflow.sklearn
 import pandas as pd
-import numpy as np
 from datetime import datetime, timezone
 from loguru import logger
 from pathlib import Path
-from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import (roc_auc_score, precision_score, recall_score,
                               f1_score, average_precision_score)
 from sklearn.preprocessing import StandardScaler

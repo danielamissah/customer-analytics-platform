@@ -6,14 +6,12 @@ Supports conversion rate tests (chi-square) and
 continuous metric tests (t-test / Mann-Whitney U).
 """
 
-import os
-import yaml
 import numpy as np
 import pandas as pd
 from datetime import datetime, timezone
 from loguru import logger
 from scipy import stats
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from typing import Optional
 
 from src.data.features import load_config, get_engine

@@ -141,16 +141,16 @@ def should_churn(plan: str, days_active: int,
     return random.random() < (daily_rate * days_active)
 
 
-def seed_historical_data(engine, config: dict, days_back: int = 365):
+def seed_historical_data(engine, config: dict, days_back: int = 365,
+                          n_users: int = 3000):
     """
-    Seed one year of historical data on first run.
-    Uses Telco-style churn distributions for realistic model training.
+    Seed historical data on first run.
+    Use n_users=500, days_back=90 for fast cloud seeding.
     """
-    logger.info(f"Seeding {days_back} days of historical data...")
+    logger.info(f"Seeding {n_users} users over {days_back} days...")
     now = datetime.now(timezone.utc)
 
     all_users, all_events, all_txns = [], [], []
-    n_users = 3000  # historical user base
 
     for _ in range(n_users):
         signup_date  = now - timedelta(days=random.randint(1, days_back))
@@ -159,7 +159,7 @@ def seed_historical_data(engine, config: dict, days_back: int = 365):
 
         events = generate_events(
             user["user_id"], signup_date, user["plan"],
-            min(days_active, 90)
+            min(days_active, 30)  # cap at 30 days of events to keep inserts manageable
         )
         txns = generate_transactions(
             user["user_id"], user["plan"], signup_date, days_active
@@ -175,7 +175,6 @@ def seed_historical_data(engine, config: dict, days_back: int = 365):
             user["is_churned"] = True
             user["churned_at"] = churn_day.isoformat()
 
-        # Calculate actual LTV
         ltv = sum(t["amount"] for t in txns if t["status"] == "success")
         user["ltv_actual"] = round(float(ltv), 2)
 
@@ -183,9 +182,17 @@ def seed_historical_data(engine, config: dict, days_back: int = 365):
         all_events.extend(events)
         all_txns.extend(txns)
 
-    _insert_batch(engine, config, all_users, all_events, all_txns)
-    logger.success(f"Seeded {len(all_users)} historical users, "
-                   f"{len(all_events)} events, {len(all_txns)} transactions")
+        # Insert in batches of 200 users to avoid memory issues
+        if len(all_users) % 200 == 0:
+            _insert_batch(engine, config, all_users, all_events, all_txns)
+            logger.info(f"Inserted {len(all_users)} users so far...")
+            all_users, all_events, all_txns = [], [], []
+
+    # Insert remaining
+    if all_users:
+        _insert_batch(engine, config, all_users, all_events, all_txns)
+
+    logger.success(f"Seeding complete")
 
 
 def generate_nightly(engine, config: dict):
@@ -246,36 +253,36 @@ def generate_nightly(engine, config: dict):
             "new_txns": len(all_txns), "new_churns": len(churned_ids)}
 
 
-def _insert_batch(engine, config, users, events, txns):
-    """Bulk insert users, events, and transactions."""
+def _insert_batch(engine, config, users, events, txns, chunk_size=500):
+    """Bulk insert using pandas to_sql — much faster over remote connections."""
+    import json
+    import pandas as pd
+
     with engine.connect() as conn:
         if users:
-            conn.execute(text("""
-                INSERT INTO users
-                  (user_id, created_at, plan, channel, country, age,
-                   is_churned, churned_at, ltv_actual)
-                VALUES
-                  (:user_id, :created_at, :plan, :channel, :country, :age,
-                   :is_churned, :churned_at, :ltv_actual)
-                ON CONFLICT (user_id) DO NOTHING
-            """), users)
+            pd.DataFrame(users).to_sql(
+                "users", conn, if_exists="append", index=False,
+                method="multi", chunksize=500
+            )
+            conn.commit()
 
         if events:
-            import json
-            conn.execute(text("""
-                INSERT INTO user_events (user_id, event_type, event_at, metadata)
-                VALUES (:user_id, :event_type, :event_at, cast(:metadata as jsonb))
-            """), [
-                {**e, "metadata": json.dumps(e.get("metadata", {}))} for e in events
-            ])
+            df_e = pd.DataFrame(events)
+            df_e["metadata"] = df_e["metadata"].apply(
+                lambda x: json.dumps(x) if isinstance(x, dict) else str(x)
+            )
+            df_e.to_sql(
+                "user_events", conn, if_exists="append", index=False,
+                method="multi", chunksize=2000
+            )
+            conn.commit()
 
         if txns:
-            conn.execute(text("""
-                INSERT INTO transactions (user_id, amount, currency, status, tx_at)
-                VALUES (:user_id, :amount, :currency, :status, :tx_at)
-            """), txns)
-
-        conn.commit()
+            pd.DataFrame(txns).to_sql(
+                "transactions", conn, if_exists="append", index=False,
+                method="multi", chunksize=500
+            )
+            conn.commit()
 
 
 if __name__ == "__main__":
@@ -284,7 +291,11 @@ if __name__ == "__main__":
     engine = get_engine(cfg)
 
     if "--seed" in sys.argv:
-        seed_historical_data(engine, cfg)
+        # --fast-seed for cloud DBs (500 users, 90 days)
+        if "--fast" in sys.argv:
+            seed_historical_data(engine, cfg, days_back=90, n_users=500)
+        else:
+            seed_historical_data(engine, cfg, days_back=365, n_users=3000)
     else:
         result = generate_nightly(engine, cfg)
         print(result)
