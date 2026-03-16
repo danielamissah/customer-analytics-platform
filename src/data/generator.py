@@ -290,12 +290,14 @@ if __name__ == "__main__":
     cfg    = load_config()
     engine = get_engine(cfg)
 
+    n_users = 1000
+    for arg in sys.argv:
+        if arg.startswith("--users="):
+            n_users = int(arg.split("=")[1])
+
     if "--seed" in sys.argv:
-        # --fast-seed for cloud DBs (500 users, 90 days)
-        if "--fast" in sys.argv:
-            seed_historical_data(engine, cfg, days_back=90, n_users=500)
-        else:
-            seed_historical_data(engine, cfg, days_back=365, n_users=3000)
+        days = 90 if "--fast" in sys.argv else 365
+        seed_historical_data(engine, cfg, days_back=days, n_users=n_users)
     else:
         result = generate_nightly(engine, cfg)
         print(result)
