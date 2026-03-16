@@ -45,7 +45,14 @@ RISK_COLORS = {"low": "#2ECC71", "medium": "#F39C12", "high": "#E74C3C"}
 
 @st.cache_resource
 def get_engine():
-    return create_engine(DB_URL)
+    url = DB_URL
+    # Ensure SSL for Supabase / cloud connections
+    if "supabase" in url or "sslmode" not in url:
+        if "?" in url:
+            url += "&sslmode=require"
+        else:
+            url += "?sslmode=require"
+    return create_engine(url, connect_args={"sslmode": "require"})
 
 engine = get_engine()
 
@@ -179,7 +186,8 @@ with st.sidebar:
 
     st.divider()
     st.caption("**Stack:** PostgreSQL · XGBoost · FastAPI · MLflow · Streamlit")
-    
+    # st.caption("**GitHub:** [customer-analytics-platform](https://github.com/danielamissah/customer-analytics-platform)")
+
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
