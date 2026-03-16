@@ -192,7 +192,7 @@ def seed_historical_data(engine, config: dict, days_back: int = 365,
     if all_users:
         _insert_batch(engine, config, all_users, all_events, all_txns)
 
-    logger.success(f"Seeding complete")
+    logger.success("Seeding complete")
 
 
 def generate_nightly(engine, config: dict):
