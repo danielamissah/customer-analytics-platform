@@ -10,53 +10,64 @@ jobs:
     name: Generate Data & Retrain Models
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER:     analytics
-          POSTGRES_PASSWORD: analytics
-          POSTGRES_DB:       customer_analytics
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-retries 5
-
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI || 'sqlite:///mlflow.db' }}
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check required secrets
+        id: check_secrets
+        run: |
+          if [ -z "${{ secrets.DATABASE_URL }}" ]; then
+            echo "DATABASE_URL secret not set — skipping nightly run"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Set up Python
+        if: steps.check_secrets.outputs.skip == 'false'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
 
       - name: Install dependencies
+        if: steps.check_secrets.outputs.skip == 'false'
         run: pip install -r requirements.txt
 
       - name: Generate nightly data
+        if: steps.check_secrets.outputs.skip == 'false'
         run: |
           PYTHONPATH=. python src/data/generator.py
           echo "Nightly data generation complete"
 
       - name: Retrain churn model
+        if: steps.check_secrets.outputs.skip == 'false'
         run: |
           PYTHONPATH=. python src/models/churn.py
           echo "Churn model retrained"
 
       - name: Retrain LTV model
+        if: steps.check_secrets.outputs.skip == 'false'
         run: |
           PYTHONPATH=. python src/models/ltv.py
           echo "LTV model retrained"
 
       - name: Trigger API reload
+        if: steps.check_secrets.outputs.skip == 'false'
         run: |
           curl -X POST "${{ secrets.API_URL }}/retrain" \
                -H "Content-Type: application/json" || true
           echo "API reload triggered"
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.check_secrets.outputs.skip }}" == "true" ]; then
+            echo "### Nightly Run Skipped" >> $GITHUB_STEP_SUMMARY
+            echo "DATABASE_URL secret not configured. Add it in repo Settings → Secrets." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### Nightly Run Complete ✅" >> $GITHUB_STEP_SUMMARY
+          fi
