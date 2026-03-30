@@ -242,7 +242,7 @@ def generate_nightly(engine, config: dict):
         with engine.connect() as conn:
             conn.execute(text(
                 "UPDATE users SET is_churned = TRUE, churned_at = NOW() "
-                "WHERE user_id = ANY(:ids)"
+                "WHERE user_id = ANY(:ids::uuid[])"
             ), {"ids": churned_ids})
             conn.commit()
         logger.info(f"Marked {len(churned_ids)} users as churned")
